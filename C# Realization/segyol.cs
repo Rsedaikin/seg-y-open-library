@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Management;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.IO;
 
 namespace SEGYOL
@@ -71,6 +67,49 @@ namespace SEGYOL
             sgyCoord = new float[count][];
             for (int i = 0; i < sgyCoord.GetLength(0); i++)
                 sgyCoord[i] = new float[3];
+        }
+        public void SetCoord(int num_trace, float[] array)
+        {
+            try
+            {
+                array.CopyTo(sgyCoord[num_trace], 0);
+            }
+            catch (Exception exc)
+            {
+                Console.WriteLine("Size of input array is biger than output array.\nError: " + exc.ToString());
+            }
+        }
+        private void ReadCoord(int num_trace)
+        {
+
+            int scalarElevation = CharArrayToInteger(GetTraceHeader(num_trace).Skip(68).Take(2).ToArray(), isBigEndianOrder);
+            int scalarXY = CharArrayToInteger(GetTraceHeader(num_trace).Skip(70).Take(2).ToArray(), isBigEndianOrder);
+            int scalarCUnit = CharArrayToInteger(GetTraceHeader(num_trace).Skip(88).Take(2).ToArray(), isBigEndianOrder);
+
+            if (scalarCUnit == 2)
+                scalarCUnit = 3600;
+            else
+                scalarCUnit = 1;
+
+            float[] coordinates = new float[3];
+
+            //Z
+            int sampleTake = CharArrayToInteger(GetTraceHeader(num_trace).Skip(40).Take(4).ToArray(), isBigEndianOrder);
+            if (scalarElevation < 0) coordinates[2] = (float)sampleTake / (-1.0f * (float)scalarElevation);
+            if (scalarElevation > 0) coordinates[2] = (float)sampleTake * (float)scalarElevation;
+            if (scalarElevation == 0) coordinates[2] = (float)sampleTake;
+
+            //X
+            sampleTake = CharArrayToInteger(GetTraceHeader(num_trace).Skip(72).Take(4).ToArray(), isBigEndianOrder);
+            if (scalarXY < 0) coordinates[0] = (float)sampleTake / (-1.0f * (float)scalarXY * (float)scalarCUnit);
+            if (scalarXY > 0) coordinates[0] = (float)sampleTake * (float)scalarXY / (float)scalarCUnit;
+            if (scalarXY == 0) coordinates[0] = (float)sampleTake / (float)scalarCUnit;
+
+            //Y
+            sampleTake = CharArrayToInteger(GetTraceHeader(num_trace).Skip(76).Take(4).ToArray(), isBigEndianOrder);
+            if (scalarXY < 0) coordinates[1] = (float)sampleTake / (-1.0f * (float)scalarXY * (float)scalarCUnit);
+            if (scalarXY > 0) coordinates[1] = (float)sampleTake * (float)scalarXY / (float)scalarCUnit;
+            if (scalarXY == 0) coordinates[1] = (float)sampleTake / (float)scalarCUnit;
         }
 
         private byte[][] sgyTraceHeader;
@@ -187,7 +226,6 @@ namespace SEGYOL
         {
             return CharArrayToInteger(sgyTraceHeader[num_trace].Skip(164).Take(2).ToArray(), isBigEndianOrder);
         }
-
         public DateTime GetDate(int num_trace)
         {
             int y = CharArrayToInteger(sgyTraceHeader[num_trace].Skip(156).Take(2).ToArray(), isBigEndianOrder);
@@ -363,7 +401,7 @@ namespace SEGYOL
                 byte[] read_header = new byte[240];
                 read_sgy_file.Read(read_header, 0, 240);
                 SetTraceHeader(read_header, i);
-
+                ReadCoord(i);
                 byte[] read_trace = new byte[GetDiscretNumber() * bytesInSample];
                 read_sgy_file.Read(read_trace, 0, GetDiscretNumber() * bytesInSample);
                 SetDataTrace(i, read_trace);
@@ -373,8 +411,7 @@ namespace SEGYOL
 
         public void WriteFile(String path_name)
         {
-            path_name.Replace(".sgy", "");
-            path_name = path_name + ".sgy";
+            path_name = path_name.Replace(".sgy", "") + ".sgy";
 
             FileStream write_sgy_file = File.Open(path_name, FileMode.Create, FileAccess.Write);
             write_sgy_file.Write(GetTextHeader(), 0, 3200);
