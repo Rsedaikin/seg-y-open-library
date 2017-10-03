@@ -24,11 +24,11 @@ namespace SEGYOL
             {
                 case false:
                     for (int i = array.Length - 1; i >= 0; i--)
-                        value = (value << 8) + array[i];
+                        value = (int)((value << 8) & 0xFFFFFF00) + (array[i] & 0x000000FF);
                     break;
                 case true:
-                    foreach (byte item in array)
-                        value = (value << 8) + item;
+                    for (int i = 0; i < array.Length; i++)
+                        value = (int)((value << 8) & 0xFFFFFF00) + (array[i] & 0x000000FF);
                     break;
                 default:
                     break;
@@ -68,11 +68,102 @@ namespace SEGYOL
             for (int i = 0; i < sgyCoord.GetLength(0); i++)
                 sgyCoord[i] = new float[3];
         }
-        public void SetCoord(int num_trace, float[] array)
+        public void SetCoord(int num_trace, float[] array, String coordinate_units, String measurment)
         {
             try
             {
                 array.CopyTo(sgyCoord[num_trace], 0);
+
+                sgyCommonHeader[54] = 0;
+
+                if (measurment == "METERS")
+                    sgyCommonHeader[55] = 1;
+                else if (measurment == "FEET")
+                    sgyCommonHeader[55] = 2;
+                else
+                    sgyCommonHeader[55] = 1;
+
+                sgyCoord[num_trace][0] = array[0];
+                sgyCoord[num_trace][1] = array[1];
+                sgyCoord[num_trace][2] = array[2];
+
+                int scalar = 10000;
+
+                if (coordinate_units == "LENGHT")
+                {
+                    //scalar to elevations
+                    sgyTraceHeader[num_trace][68] = 1;
+
+                    //scalar to coords
+                    sgyTraceHeader[num_trace][70] = 1;
+
+                    //coordinate units
+                    sgyTraceHeader[num_trace][89] = 0x00;
+                    sgyTraceHeader[num_trace][88] = 0x01;
+                }
+                else if (coordinate_units == "SECONDS")
+                {
+                    scalar = 1000;
+                    //scalar to elevations
+                    sgyTraceHeader[num_trace][69] = 0xe8;
+                    sgyTraceHeader[num_trace][68] = 0x3;
+
+                    //scalar to coords
+                    sgyTraceHeader[num_trace][71] = 0xe8;
+                    sgyTraceHeader[num_trace][70] = 0x3;
+
+                    //coordinate units
+                    sgyTraceHeader[num_trace][89] = 0x00;
+                    sgyTraceHeader[num_trace][88] = 0x02;
+
+                }
+                else if (coordinate_units == "DEGREES")
+                {
+                    //scalar to elevations
+                    sgyTraceHeader[num_trace][69] = 0xf0;
+                    sgyTraceHeader[num_trace][68] = 0xd8;
+
+                    //scalar to coords
+                    sgyTraceHeader[num_trace][71] = 0xf0;
+                    sgyTraceHeader[num_trace][70] = 0xd8;
+
+                    //coordinate units
+                    sgyTraceHeader[num_trace][89] = 0x00;
+                    sgyTraceHeader[num_trace][88] = 0x03;
+                }
+                else
+                {
+                    //"Unknown type. Degrees is set.";
+                }
+
+                //Z
+                byte[] value = BitConverter.GetBytes((int)(sgyCoord[num_trace][2] * scalar));
+                sgyTraceHeader[num_trace][40] = value[0];
+                sgyTraceHeader[num_trace][41] = value[1];
+                sgyTraceHeader[num_trace][42] = value[2];
+                sgyTraceHeader[num_trace][43] = value[3];
+                //X
+                value = BitConverter.GetBytes((int)(sgyCoord[num_trace][0] * scalar));
+                sgyTraceHeader[num_trace][72] = value[0];
+                sgyTraceHeader[num_trace][73] = value[1];
+                sgyTraceHeader[num_trace][74] = value[2];
+                sgyTraceHeader[num_trace][75] = value[3];
+
+                sgyTraceHeader[num_trace][180] = value[0];
+                sgyTraceHeader[num_trace][181] = value[1];
+                sgyTraceHeader[num_trace][182] = value[2];
+                sgyTraceHeader[num_trace][183] = value[3];
+                //Y
+                value = BitConverter.GetBytes((int)(sgyCoord[num_trace][1] * scalar));
+                sgyTraceHeader[num_trace][76] = value[0];
+                sgyTraceHeader[num_trace][77] = value[1];
+                sgyTraceHeader[num_trace][78] = value[2];
+                sgyTraceHeader[num_trace][79] = value[3];
+
+                sgyTraceHeader[num_trace][184] = value[0];
+                sgyTraceHeader[num_trace][185] = value[1];
+                sgyTraceHeader[num_trace][186] = value[2];
+                sgyTraceHeader[num_trace][187] = value[3];
             }
             catch (Exception exc)
             {
@@ -163,18 +254,41 @@ namespace SEGYOL
         }
 
         private int sgyDataFormatCode;
-        public void SetDataFormatCode(int value) { sgyDataFormatCode = value; }
+        public void SetDataFormatCode(int value)
+        {
+            byte[] dcf = BitConverter.GetBytes(value);
+            sgyCommonHeader[24] = dcf[1];
+            sgyCommonHeader[25] = dcf[0];
+            sgyDataFormatCode = value;
+        }
         public int GetDataFormatCode()
         {
             return CharArrayToInteger(sgyCommonHeader.Skip(24).Take(2).ToArray(), isBigEndianOrder);
         }
 
         private int sgyTraceCount;
-        public void SetTraceCount(int value) { sgyTraceCount = value; }
+        public void SetTraceCount(int value)
+        {
+            byte[] tc = BitConverter.GetBytes(value);
+            sgyCommonHeader[12] = tc[1];
+            sgyCommonHeader[13] = tc[0];
+            sgyCommonHeader[14] = tc[1];
+            sgyCommonHeader[15] = tc[0];
+            sgyTraceCount = value;
+        }
         public int GetTraceCount() { return sgyTraceCount; }
 
         private int sgyMicroTimeStep;
         public void SetMicroTimeStep(int value) { sgyMicroTimeStep = value; }
+        public void SetMicroTimeStep(int num_trace, int value)
+        {
+            byte[] mts = BitConverter.GetBytes(value);
+            sgyCommonHeader[16] = mts[1];
+            sgyCommonHeader[17] = mts[0];
+            sgyTraceHeader[num_trace][116] = mts[1];
+            sgyTraceHeader[num_trace][117] = mts[0];
+            sgyMicroTimeStep = value;
+        }
         public int GetMicroTimeStep() { return sgyMicroTimeStep; }
         public int GetMicroTimeStep(int num_trace)
         {
@@ -183,6 +297,17 @@ namespace SEGYOL
 
         private int sgyDiscretNumber;
         public void SetDiscretNumber(int value) { sgyDiscretNumber = value; }
+        public void SetDiscretNumber(int num_trace, int value)
+        {
+            byte[] dn = BitConverter.GetBytes(value);
+            sgyCommonHeader[20] = dn[1];
+            sgyCommonHeader[21] = dn[0];
+            sgyCommonHeader[22] = dn[1];
+            sgyCommonHeader[23] = dn[0];
+            sgyTraceHeader[num_trace][114] = dn[1];
+            sgyTraceHeader[num_trace][115] = dn[0];
+            sgyDiscretNumber = value;
+        }
         public int GetDiscretNumber() { return sgyDiscretNumber; }
         public int GetDiscretNumber(int num_trace)
         {
@@ -191,6 +316,13 @@ namespace SEGYOL
 
         private int sgyIGC;
         public void SetIGC(int value) { sgyIGC = value; }
+        public void SetIGC(int num_trace, int value)
+        {
+            byte[] igc = BitConverter.GetBytes(value);
+            sgyTraceHeader[num_trace][120] = igc[1];
+            sgyTraceHeader[num_trace][121] = igc[0];
+            sgyIGC = value;
+        }
         public int GetIGC(int num_trace)
         {
             return CharArrayToInteger(sgyTraceHeader[num_trace].Skip(120).Take(2).ToArray(), isBigEndianOrder);
@@ -198,33 +330,96 @@ namespace SEGYOL
 
         private int sgyYear;
         public void SetYear(int value) { sgyYear = value; }
+        public void SetYear(int num_trace, int value)
+        {
+            byte[] y = BitConverter.GetBytes(value);
+            sgyTraceHeader[num_trace][156] = y[1];
+            sgyTraceHeader[num_trace][157] = y[0];
+            sgyYear = value;
+        }
         public int GetYear(int num_trace)
         {
             return CharArrayToInteger(sgyTraceHeader[num_trace].Skip(156).Take(2).ToArray(), isBigEndianOrder);
         }
         private int sgyDay;
         public void SetDayOfYear(int value) { sgyDay = value; }
+        public void SetDayOfYear(int num_trace, int value)
+        {
+            byte[] d = BitConverter.GetBytes(value);
+            sgyTraceHeader[num_trace][158] = d[1];
+            sgyTraceHeader[num_trace][159] = d[0];
+            sgyDay = value;
+        }
         public int GetDayOfYear(int num_trace)
         {
             return CharArrayToInteger(sgyTraceHeader[num_trace].Skip(158).Take(2).ToArray(), isBigEndianOrder);
         }
         private int sgyHour;
         public void SetHour(int value) { sgyHour = value; }
+        public void SetHour(int num_trace, int value)
+        {
+            byte[] h = BitConverter.GetBytes(value);
+            sgyTraceHeader[num_trace][160] = h[1];
+            sgyTraceHeader[num_trace][161] = h[0];
+            sgyHour = value;
+        }
         public int GetHour(int num_trace)
         {
             return CharArrayToInteger(sgyTraceHeader[num_trace].Skip(160).Take(2).ToArray(), isBigEndianOrder);
         }
         private int sgyMin;
         public void SetMin(int value) { sgyMin = value; }
+        public void SetMin(int num_trace, int value)
+        {
+            byte[] m = BitConverter.GetBytes(value);
+            sgyTraceHeader[num_trace][162] = m[1];
+            sgyTraceHeader[num_trace][163] = m[0];
+            sgyMin = value;
+        }
         public int GetMin(int num_trace)
         {
             return CharArrayToInteger(sgyTraceHeader[num_trace].Skip(162).Take(2).ToArray(), isBigEndianOrder);
         }
         private int sgySec;
         public void SetSec(int value) { sgySec = value; }
+        public void SetSec(int num_trace, int value)
+        {
+            byte[] s = BitConverter.GetBytes(value);
+            sgyTraceHeader[num_trace][164] = s[1];
+            sgyTraceHeader[num_trace][165] = s[0];
+            sgySec = value;
+        }
         public int GetSec(int num_trace)
         {
             return CharArrayToInteger(sgyTraceHeader[num_trace].Skip(164).Take(2).ToArray(), isBigEndianOrder);
+        }
+        public void SetDate(int num_trace, DateTime dt)
+        {
+            sgyYear = dt.Year;
+            sgyDay = dt.DayOfYear;
+            sgyHour = dt.Hour;
+            sgyMin = dt.Minute;
+            sgySec = dt.Second;
+
+            byte[] date = BitConverter.GetBytes(dt.Year);
+            sgyTraceHeader[num_trace][156] = date[1];
+            sgyTraceHeader[num_trace][157] = date[0];
+
+            date = BitConverter.GetBytes(dt.DayOfYear);
+            sgyTraceHeader[num_trace][158] = date[1];
+            sgyTraceHeader[num_trace][159] = date[0];
+
+            date = BitConverter.GetBytes(dt.Hour);
+            sgyTraceHeader[num_trace][160] = date[1];
+            sgyTraceHeader[num_trace][161] = date[0];
+
+            date = BitConverter.GetBytes(dt.Minute);
+            sgyTraceHeader[num_trace][162] = date[1];
+            sgyTraceHeader[num_trace][163] = date[0];
+
+            date = BitConverter.GetBytes(dt.Second);
+            sgyTraceHeader[num_trace][164] = date[1];
+            sgyTraceHeader[num_trace][165] = date[0];
         }
         public DateTime GetDate(int num_trace)
         {
@@ -347,6 +542,7 @@ namespace SEGYOL
 
             return true;
         }
+
         public void ReadFileInBytes(String path_name)
         {
             FileStream read_sgy_file = File.Open(path_name, FileMode.Open, FileAccess.Read);
@@ -359,6 +555,7 @@ namespace SEGYOL
             read_sgy_file.Read(read_common, 0, 400);
 
             SetCommonHeader(read_common);
+
             SetDataFormatCode(CharArrayToInteger(read_common.Skip(24).Take(2).ToArray(), IsBigEndianOrder));
             int bytesInSample = 0;
             switch (GetDataFormatCode())
@@ -374,10 +571,10 @@ namespace SEGYOL
                     break;
             }
 
-            SetDiscretNumber(CharArrayToInteger(read_common.Skip(20).Take(2).ToArray(), IsBigEndianOrder));
-            SetTraceCount(CharArrayToInteger(read_common.Skip(12).Take(2).ToArray(), IsBigEndianOrder));
-            if (GetTraceCount() != (read_sgy_file.Length - 3600) / (GetDiscretNumber() * bytesInSample + 240))
-                SetTraceCount((int)(read_sgy_file.Length - 3600) / (GetDiscretNumber() * bytesInSample + 240));
+            int dn = CharArrayToInteger(read_common.Skip(20).Take(2).ToArray(), IsBigEndianOrder);
+            int tn = CharArrayToInteger(read_common.Skip(12).Take(2).ToArray(), IsBigEndianOrder);
+            if (tn != (read_sgy_file.Length - 3600) / (dn * bytesInSample + 240))
+                tn = (int)(read_sgy_file.Length - 3600) / (dn * bytesInSample + 240);
 
             SetMicroTimeStep(CharArrayToInteger(read_common.Skip(16).Take(2).ToArray(), IsBigEndianOrder));
 
@@ -390,20 +587,24 @@ namespace SEGYOL
             SetSec(CharArrayToInteger(read_common.Skip(164).Take(2).ToArray(), isBigEndianOrder));
             SetIGC(CharArrayToInteger(read_common.Skip(120).Take(2).ToArray(), isBigEndianOrder));
 
-            TraceHeaderInit(GetTraceCount());
-            CoordInit(GetTraceCount());
+            TraceHeaderInit(tn);
 
-            SgyDataInit(GetTraceCount(), GetDiscretNumber() * bytesInSample);
+            SetDiscretNumber(dn);
+            SetTraceCount(tn);
+
+            CoordInit(tn);
+
+            SgyDataInit(tn, dn * bytesInSample);
 
             read_sgy_file.Seek(3600, SeekOrigin.Begin);
-            for (int i = 0; i < GetTraceCount(); i++)
+            for (int i = 0; i < tn; i++)
             {
                 byte[] read_header = new byte[240];
                 read_sgy_file.Read(read_header, 0, 240);
                 SetTraceHeader(read_header, i);
                 ReadCoord(i);
-                byte[] read_trace = new byte[GetDiscretNumber() * bytesInSample];
-                read_sgy_file.Read(read_trace, 0, GetDiscretNumber() * bytesInSample);
+                byte[] read_trace = new byte[dn * bytesInSample];
+                read_sgy_file.Read(read_trace, 0, dn * bytesInSample);
                 SetDataTrace(i, read_trace);
             }
             read_sgy_file.Close();
