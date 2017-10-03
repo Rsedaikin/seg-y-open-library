@@ -25,7 +25,7 @@ public:
     bool setTraceHeader(char * arr,int num_trace);
 
     int  getDataFormatCode();
-    bool setDataFormatCode(int num_trace,int dfc);
+    bool setDataFormatCode(int dfc);
 
     int getDiscretNumber();
     int  getDiscretNumber(int num_trace);

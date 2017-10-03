@@ -341,12 +341,12 @@ bool segyol::setTraceHeader(char *arr, int num_trace)
         return false;
 }
 
-bool segyol::setDataFormatCode(int num_trace, int dfc)
+bool segyol::setDataFormatCode(int dfc)
 {
     if(stored_sgy_file_name != "")
     {
-        SData.TraceHeader[num_trace][24] = (dfc&0x0000FF00) >> 8;
-        SData.TraceHeader[num_trace][25] = (dfc&0x000000FF);
+        SData.CommonHeader[24] = (dfc&0x0000FF00) >> 8;
+        SData.CommonHeader[25] = (dfc&0x000000FF);
         SData.DataFormatCode = dfc;
         return true;
     }
