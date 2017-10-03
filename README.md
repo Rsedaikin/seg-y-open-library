@@ -1,2 +1,2 @@
-# seg-y-open-lybrary
-SEG-Y Open Lybrary provides basic methods to open/write/create/edit files recorded in SEG-Y format.
+# seg-y-open-library
+SEG-Y Open Library provides basic methods to open/write/create/edit files recorded in SEG-Y format.
