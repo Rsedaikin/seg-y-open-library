@@ -40,9 +40,6 @@ namespace SEGYOL
             return value;
         }
 
-        public const bool YD = true;
-        public const bool YMD = false;
-
         private bool isBigEndianOrder = true;
         public bool IsBigEndianOrder { get => isBigEndianOrder; set => isBigEndianOrder = value; }
 
