@@ -86,6 +86,13 @@ namespace SEGYOL
             for (int i = 0; i < sgyCoord.GetLength(0); i++)
                 sgyCoord[i] = new float[3];
         }
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="num_trace"></param>
+        /// <param name="array"></param>
+        /// <param name="coordinate_units">LENGHT or SECONDS or DEGREES</param>
+        /// <param name="measurment">METERS or FEET</param>
         public void SetCoord(int num_trace, float[] array, String coordinate_units, String measurment)
         {
             try
@@ -109,15 +116,16 @@ namespace SEGYOL
 
                 if (coordinate_units == "LENGHT")
                 {
+                    scalar = 1;
                     //scalar to elevations
-                    sgyTraceHeader[num_trace][68] = 1;
+                    sgyTraceHeader[num_trace][69] = 1;
 
                     //scalar to coords
-                    sgyTraceHeader[num_trace][70] = 1;
+                    sgyTraceHeader[num_trace][71] = 1;
 
                     //coordinate units
-                    sgyTraceHeader[num_trace][89] = 0x00;
-                    sgyTraceHeader[num_trace][88] = 0x01;
+                    sgyTraceHeader[num_trace][89] = 0x01;
+                    sgyTraceHeader[num_trace][88] = 0x00;
                 }
                 else if (coordinate_units == "SECONDS")
                 {
@@ -156,32 +164,32 @@ namespace SEGYOL
 
                 //Z
                 byte[] value = BitConverter.GetBytes((int)(sgyCoord[num_trace][2] * scalar));
-                sgyTraceHeader[num_trace][40] = value[0];
-                sgyTraceHeader[num_trace][41] = value[1];
-                sgyTraceHeader[num_trace][42] = value[2];
-                sgyTraceHeader[num_trace][43] = value[3];
+                sgyTraceHeader[num_trace][40] = value[3];
+                sgyTraceHeader[num_trace][41] = value[2];
+                sgyTraceHeader[num_trace][42] = value[1];
+                sgyTraceHeader[num_trace][43] = value[0];
                 //X
                 value = BitConverter.GetBytes((int)(sgyCoord[num_trace][0] * scalar));
-                sgyTraceHeader[num_trace][72] = value[0];
-                sgyTraceHeader[num_trace][73] = value[1];
-                sgyTraceHeader[num_trace][74] = value[2];
-                sgyTraceHeader[num_trace][75] = value[3];
+                sgyTraceHeader[num_trace][72] = value[3];
+                sgyTraceHeader[num_trace][73] = value[2];
+                sgyTraceHeader[num_trace][74] = value[1];
+                sgyTraceHeader[num_trace][75] = value[0];
 
-                sgyTraceHeader[num_trace][180] = value[0];
-                sgyTraceHeader[num_trace][181] = value[1];
-                sgyTraceHeader[num_trace][182] = value[2];
-                sgyTraceHeader[num_trace][183] = value[3];
+                sgyTraceHeader[num_trace][180] = value[3];
+                sgyTraceHeader[num_trace][181] = value[2];
+                sgyTraceHeader[num_trace][182] = value[1];
+                sgyTraceHeader[num_trace][183] = value[0];
                 //Y
                 value = BitConverter.GetBytes((int)(sgyCoord[num_trace][1] * scalar));
-                sgyTraceHeader[num_trace][76] = value[0];
-                sgyTraceHeader[num_trace][77] = value[1];
-                sgyTraceHeader[num_trace][78] = value[2];
-                sgyTraceHeader[num_trace][79] = value[3];
+                sgyTraceHeader[num_trace][76] = value[3];
+                sgyTraceHeader[num_trace][77] = value[2];
+                sgyTraceHeader[num_trace][78] = value[1];
+                sgyTraceHeader[num_trace][79] = value[0];
 
-                sgyTraceHeader[num_trace][184] = value[0];
-                sgyTraceHeader[num_trace][185] = value[1];
-                sgyTraceHeader[num_trace][186] = value[2];
-                sgyTraceHeader[num_trace][187] = value[3];
+                sgyTraceHeader[num_trace][184] = value[3];
+                sgyTraceHeader[num_trace][185] = value[2];
+                sgyTraceHeader[num_trace][186] = value[1];
+                sgyTraceHeader[num_trace][187] = value[0];
             }
             catch (Exception exc)
             {
@@ -558,6 +566,22 @@ namespace SEGYOL
                 sgyTraceHeader[i][165] = byteArray[0];
             }
 
+            int bytesInSample = 0;
+            switch (GetDataFormatCode())
+            {
+                case 2:
+                case 5:
+                    bytesInSample = 4;
+                    break;
+                case 3:
+                    bytesInSample = 2;
+                    break;
+                default:
+                    break;
+            }
+
+            SgyDataInit(GetTraceCount(), GetDiscretNumber() * bytesInSample);
+            CoordInit(GetTraceCount());
             return true;
         }
 
@@ -656,6 +680,24 @@ namespace SEGYOL
                 write_sgy_file.Write(GetDataTrace(i), 0, GetDiscretNumber() * bytesInSample);
             }
             write_sgy_file.Close();
+        }
+
+        public int GetBytesNumberOfSample()
+        {
+            int bytesInSample = 0;
+            switch (GetDataFormatCode())
+            {
+                case 2:
+                case 5:
+                    bytesInSample = 4;
+                    break;
+                case 3:
+                    bytesInSample = 2;
+                    break;
+                default:
+                    break;
+            }
+            return bytesInSample;
         }
     }
 }
